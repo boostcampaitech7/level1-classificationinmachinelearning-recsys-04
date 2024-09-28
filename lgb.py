@@ -17,7 +17,7 @@ from lightgbm import LGBMClassifier
 
 ### Data Load
 
-location = 'C:\\Users\\gagoo\\Desktop\\jupyter\\boost\\비트코인'
+location = ''
 
 data_path: str = location+'\\data'
 train_df: pd.DataFrame = pd.read_csv(os.path.join(data_path, "train.csv")).assign(_type="train") 
