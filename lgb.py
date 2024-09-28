@@ -45,7 +45,7 @@ for _file_name, _df in tqdm(file_dict.items()):
     df = df.merge(_df, on="ID", how="left")
 
 
-# btc  liquidation, open 에 대한 변수 추가
+# btc 와 관련된 columns 계산
 columns = df.columns
 btc_columns = [col for col in columns if 'btc' in col]
 btc_liq_columns = btc_columns[:76]
@@ -59,7 +59,7 @@ for i in range(0,76,2):
     short += btc_liq_df.iloc[:,i+1].fillna(0)
 
 
-# 모델에 사용할 컬럼, 컬럼의 rename rule을 미리 할당함
+# column rename
 cols_dict: Dict[str, str] = {
     "ID": "ID",
     "target": "target",
@@ -80,6 +80,7 @@ cols_dict: Dict[str, str] = {
 df = df[cols_dict.keys()].rename(cols_dict, axis=1)
 
 
+# btc와 관련된 column 생성
 df['long_liq'] = long
 df['short_liq'] = short
 df['open'] = btc_open_df.iloc[:,:].sum(axis=1)
@@ -115,6 +116,8 @@ def fill_nan_with_previous_mean(series):
     return series
     
 
+
+
 exclude_cols = ['_type','target', 'ID']
 outlier_col = [col for col in df.columns if col not in exclude_cols]
 
@@ -144,7 +147,6 @@ df['change_liq']=df["long_liq"] - df["short_liq"]
 df['liq_sign']=np.sign(df["long_liq"] - df["short_liq"])
 df['long_liq_ratio'] = df['long_liq'] / df['total_liq']
 df['short_liq_ratio'] = df['short_liq'] / df['total_liq']
-
 df['open_diff'] = df['open'].diff()
 
 
@@ -268,7 +270,7 @@ print(f"Test Accuracy: {accuracy:.4f}")
 
 scaled_test = pd.DataFrame(scaler.transform(test_df[X_train.columns]),columns = X_train.columns)
 predict = best_model.predict_proba(scaled_test)
-pd.DataFrame(predict,columns=['0','1','2','3',]).to_csv('sm_pred.csv',index=False)
+pd.DataFrame(predict,columns=['0','1','2','3',]).to_csv('result/sm_pred.csv',index=False)
 
 print('Finish')
 
