@@ -3,13 +3,12 @@ from typing import List, Dict
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, roc_auc_score
 import lightgbm as lgb
-from scipy import stats
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
 
 # 파일 호출
-data_path: str = "../data"
+data_path: str = "C:/Users/ssk07/OneDrive/바탕 화면/코드백업/data/data"
 train_df: pd.DataFrame = pd.read_csv(os.path.join(data_path, "train.csv")).assign(_type="train") # train 에는 _type = train 
 test_df: pd.DataFrame = pd.read_csv(os.path.join(data_path, "test.csv")).assign(_type="test") # test 에는 _type = test
 submission_df: pd.DataFrame = pd.read_csv(os.path.join(data_path, "test.csv")) # ID, target 열만 가진 데이터 미리 호출
@@ -33,7 +32,10 @@ for _file_name, _df in tqdm(file_dict.items()):
     }
     _df = _df.rename(_rename_rule, axis=1)
     df = df.merge(_df, on="ID", how="left")
-
+    
+#%%
+#Feature engineering
+    
 # 모델에 사용할 컬럼, 컬럼의 rename rule을 미리 할당함
 cols_dict: Dict[str, str] = {
     "ID": "ID",
@@ -57,7 +59,7 @@ cols_dict: Dict[str, str] = {
     "hourly_network-data_addresses-count_addresses_count_sender": "sender_count",
 }
 df = df[cols_dict.keys()].rename(cols_dict, axis=1)
-
+    
 # eda 에서 파악한 차이와 차이의 음수, 양수 여부를 새로운 피쳐로 생성
 df = df.assign(
     liquidation_diff=df["long_liquidations"] - df["short_liquidations"],
@@ -98,9 +100,9 @@ def shift_feature(
     ]
     return df_shift_dict
 
-# 최대 12시간의 shift 피쳐를 계산
+# 최대 24시간의 shift 피쳐를 계산
 shift_list = shift_feature(
-    df=df, conti_cols=conti_cols, intervals=[_ for _ in range(1, 12)]
+    df=df, conti_cols=conti_cols, intervals=[_ for _ in range(1, 24)]
 )
 
 # concat 하여 df 에 할당
@@ -114,37 +116,20 @@ df = df.ffill().fillna(-999).assign(target = _target)
 train_df = df.loc[df["_type"]=="train"].drop(columns=["_type"])
 test_df = df.loc[df["_type"]=="test"].drop(columns=["_type"])
 
-# CSV 파일에서 lgb_under3_count_features 읽어오기
-lgb_under3_count_features_df = pd.read_csv('../../data/lgb_under3_count_features.csv')
+#%%
+# Model Training
 
-# lgb_under3_count_features에서 feature 목록 추출
-lgb_under3_count_features_list = lgb_under3_count_features_df['feature'].tolist()
+# train_test_split 으로 valid set, train set 분리
+x_train, x_valid, y_train, y_valid = train_test_split(
+    train_df.drop(["target", "ID"], axis = 1), 
+    train_df["target"].astype(int), 
+    test_size=0.2,
+    random_state=42,
+)
 
-x_train = train_df.drop(["target", "ID"], axis = 1)
-
-# x_tmp에서 lgb_under3_count_features에 있는 feature 제거
-x_train = x_train.drop(columns=lgb_under3_count_features_list)
-y_train = train_df["target"].astype(int)
-
-# 숫자형 열만 선택
-numeric_df = x_train.select_dtypes(include=['number'])
-
-# Z-Score 계산
-z_scores = pd.DataFrame(np.abs(stats.zscore(numeric_df)), columns=numeric_df.columns)
-
-# 각 열에 대해 Z-Score가 3을 초과하는 값들에 대해 처리
-for col in numeric_df.columns:
-    # 이상치가 아닌 값들의 최솟값과 최댓값 계산
-    non_outliers = numeric_df[z_scores[col] <= 3][col]
-    min_val, max_val = non_outliers.min(), non_outliers.max()
-        
-    # Z-Score가 3을 초과하는 경우 처리: 최솟값 또는 최댓값으로 대체
-    numeric_df[col] = np.where(z_scores[col] > 3,
-                                np.where(numeric_df[col] > max_val, max_val, min_val),
-                                numeric_df[col])
-
-# 이상치 처리 후 원래 DataFrame에 업데이트
-x_train.update(numeric_df)
+# lgb dataset
+train_data = lgb.Dataset(x_train, label=y_train)
+valid_data = lgb.Dataset(x_valid, label=y_valid, reference=train_data)
 
 # lgb params
 params = {
@@ -152,23 +137,48 @@ params = {
     "objective": "multiclass",
     "metric": "multi_logloss",
     "num_class": 4,
-    "num_leaves": 34,
-    "learning_rate": 0.11823144828121114,
-    "n_estimators": 101,
+    "num_leaves": 50,
+    "learning_rate": 0.05,
+    "n_estimators": 50,
     "random_state": 42,
     "verbose": 0,
 }
 
+# lgb train
+lgb_model = lgb.train(
+    params=params,
+    train_set=train_data,
+    valid_sets=valid_data,
+)
+
+# lgb predict
+y_valid_pred = lgb_model.predict(x_valid)
+y_valid_pred_class = np.argmax(y_valid_pred, axis = 1)
+
+# score check
+accuracy = accuracy_score(y_valid, y_valid_pred_class)
+auroc = roc_auc_score(y_valid, y_valid_pred, multi_class="ovr")
+
+print(f"acc: {accuracy}, auroc: {auroc}")
+
+# performance 체크후 전체 학습 데이터로 다시 재학습
+x_train = train_df.drop(["target", "ID"], axis = 1)
+y_train = train_df["target"].astype(int)
 train_data = lgb.Dataset(x_train, label=y_train)
 lgb_model = lgb.train(
     params=params,
     train_set=train_data,
 )
 
-# lgb predict
-test_df = test_df.drop(["target", "ID"], axis = 1)
-test_df = test_df.drop(columns=lgb_under3_count_features_list)
-y_test_pred = lgb_model.predict(test_df)
+#%%
+# Inference, Output save
 
-sy_pred = pd.DataFrame(y_test_pred)
-sy_pred.to_csv("../../results/sy_pred.csv", index=False)
+# 클래스별 예측 확률을 얻기
+y_test_pred_proba = lgb_model.predict(test_df.drop(["target", "ID"], axis=1), raw_score=False)
+
+# 예측 확률을 output 파일에 할당 후 저장
+for i in range(y_test_pred_proba.shape[1]):
+    submission_df[f"{i}"] = y_test_pred_proba[:, i]
+    
+jw_pred = submission_df.drop(columns='ID')
+jw_pred.to_csv("jw_pred1.csv", index=False)
