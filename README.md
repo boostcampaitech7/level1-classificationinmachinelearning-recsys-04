@@ -108,6 +108,22 @@
     - path: "../results/JE_pred.csv"
     weight: 0.5
     ```
+## 🎯 파이널 제출 내역
+
+
+- **제출 파일**: `results/ensemble_submission_1.csv`
+- **Private Accuracy Score**: 0.4061
+- **최종 순위**: 6등
+
+  ### 제출 파일 생성 방법
+  파이널로 제출한 파일은 `ensemble.py` 스크립트를 실행하여 생성할 수 있습니다. 
+  
+  다음 명령어를 사용하여 `ensemble_submission_1.csv` 파일을 생성하세요:
+
+  ```bash
+  python ensemble.py ensemble_submission_1.yaml
+  ```
+
 ## 😊 팀 구성원
 <div align="center">
 <table>
