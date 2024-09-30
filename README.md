@@ -57,7 +57,7 @@
 - **results 폴더**  
   이 폴더에는 각 모델이 예측한 결과 파일들이 저장됩니다. 각 CSV 파일은 모델별로 다르게 생성되며, 이를 바탕으로 최종 앙상블 결과를 도출합니다.
   
-  - `JE_pred.csv`, `ensemble_submission_1.csv`, `ensemble_submission_2.csv`, `hj_pred1.csv`, `hj_pred2.csv`, `jw_pred1.csv`, `jw_pred2.csv`, `sm_pred.csv`, `sy_pred.csv`: 각 모델의 예측 결과가 저장된 파일들입니다.
+  - `ensemble_submission_1.csv`, `ensemble_submission_2.csv`, `JE_pred.csv`, `hj_pred1.csv`, `hj_pred2.csv`, `jw_pred1.csv`, `jw_pred2.csv`, `sm_pred.csv`, `sy_pred.csv`: 각 모델의 예측 결과가 저장된 파일들입니다.
 
 - **src 폴더**  
   이 폴더에는 프로젝트의 핵심 Python 코드가 포함되어 있습니다.
