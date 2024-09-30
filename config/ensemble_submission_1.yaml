@@ -1,0 +1,9 @@
+csv_files:
+  - path: "../results/hj_pred1.csv"
+    weight: 1
+  - path: "../results/hj_pred2.csv"
+    weight: 1
+  - path: "../results/jw_pred1.csv"
+    weight: 1
+  - path: "../results/sy_pred.csv"
+    weight: 1
